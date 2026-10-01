@@ -1,5 +1,4 @@
-/* global jest, describe, test, beforeEach, expect*/
-
+/* global describe, test, expect:readonly */
 
 const service = require('./recommendationService');
 
