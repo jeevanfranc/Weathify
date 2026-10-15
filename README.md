@@ -1,396 +1,179 @@
-# 🎵 Weathify — Music That Matches Your Weather
+# 🎵 Weathify: Music That Matches Your Weather
 
-Weathify recommends songs based on your current weather conditions, time of day,
-and season. Built with Node.js, PostgreSQL, and vanilla JavaScript — no frontend
-framework required.
+Weathify recommends tracks based on your current weather conditions, time of day, and season. A weighted tag-matching engine scores songs stored in PostgreSQL against live conditions and returns ranked matches with relevance scores.
 
----
-
-## Table of Contents
-
-## License
-
-MIT — free for personal and commercial use.
+### 🚀 Architecture Overview
+*   **Frontend:** Next.js (TypeScript) running on **Port 3000**
+*   **Backend:** Node.js / Express running on **Port 5000**
+*   **Database:** PostgreSQL running on **Port 5432**
 
 ---
 
-*Built with 🎵 by the Weathify team*
-- A [Spotify Developer App](https://developer.spotify.com/dashboard)
-- An [OpenWeatherMap API key](https://openweathermap.org/api) 
+## 🛠️ Prerequisites
+
+*   Node.js (>= 18.0.0) & npm (>= 9.0.0)
+*   PostgreSQL
+*   [Spotify Developer App Credentials](https://developer.spotify.com/dashboard)
+*   [OpenWeatherMap API Key](https://openweathermap.org/api)
 
 ---
 
-## Quick Start
+## ⚡ Quick Start
+
+### 1. Clone & Install
 ```bash
-# 1. Clone this repository
+# Clone the repository
 git clone <YOUR_REPO_URL>
-cd <YOUR_CLONED_FOLDER>
+cd Weathify
 
-# 2. Install dependencies
-npm install
+# Install backend dependencies
+cd backend && npm install
 
-# 3. Configure environment
-cp .env.example .env
-# Open .env and fill in all DB_*, Spotify and OpenWeather values
+# Install frontend dependencies
+cd ../frontend && npm install
+cd ..
+```
 
-# 4. Ensure PostgreSQL is running (example for Ubuntu/Debian)
-sudo systemctl start postgresql
+### 2. Configure Environment Variables
+Create a `.env` file inside **both** the frontend and backend folders by copying their respective examples.
 
-# 5. Set up database schema + default admin (interactive)
+*   For the **Backend (`backend/.env`)**:
+    ```ini
+    NODE_ENV=development
+    PORT=5000
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_NAME=weathify_db
+    DB_USER=postgres
+    DB_PASSWORD=your_postgres_password
+    
+    # Optional Custom Admin Setup (Defaults to admin/admin123 if blank)
+    ADMIN_USER=admin
+    ADMIN_EMAIL=admin@weathify.com
+    ADMIN_PASS=admin123
+
+    SPOTIFY_CLIENT_ID=your_spotify_client_id
+    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+    SPOTIFY_REDIRECT_URI=http://localhost:5000/callback
+    OPENWEATHER_API_KEY=your_openweather_api_key
+    
+    JWT_SECRET=your_64_char_random_string
+    SESSION_SECRET=your_64_char_random_string
+    FRONTEND_URL=http://localhost:3000
+    ```
+*   For the **Frontend (`frontend/.env`)**:
+    ```ini
+    NEXT_PUBLIC_API_URL=http://localhost:5000
+    ```
+
+> 💡 **Tip:** Generate a secure 64-character secret using Node.js:
+> `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+
+### 3. Initialize the Database
+Ensure your local PostgreSQL instance is running, then run the automated setup script from the root directory:
+```bash
 chmod +x setup.sh
 ./setup.sh
+```
+*The script drops/re-creates the database, creates the schema structure, and initializes your administrator profile.*
 
-# 6. (Optional) Seed sample songs from Spotify
-# Requires valid SPOTIFY_* credentials in .env
-node database/seed_songs.js
-
-# 7. Start development server
-npm run dev
-
-# 8. Open browser
-# Main site:       http://localhost:3000
-# Login page:      http://localhost:3000/login.html
-# Dashboard:       http://localhost:3000/dashboard.html
-# Admin dashboard: http://localhost:3000/admin.html
-# Health check:    http://localhost:3000/health
+### 4. Seed Track Library (Optional)
+To query songs, seed sample data from Spotify using your configured API credentials:
+```bash
+node backend/database/seed_songs.js
 ```
 
-
+### 5. Launch Development Environments
+Open two distinct terminal windows to launch both layers concurrently:
+*   **Run Backend:** `cd backend && npm run dev` (Runs on `http://localhost:5000`)
+*   **Run Frontend:** `cd frontend && npm run dev` (Runs on `http://localhost:3000`)
 
 ---
 
-## Environment Variables
+## 🔑 Default Credentials & Admin Dashboard
 
-Copy `.env.example` to `.env` and fill in every value.
+*   **Default Admin Username:** `admin`
+*   **Default Admin Password:** `admin123`
+*   **Admin Platform Route:** `http://localhost:3000/admin.html`
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NODE_ENV` | Yes | `development` or `production` |
-| `PORT` | No | Default `3000` |
-| `DB_HOST` | Yes | PostgreSQL host |
-| `DB_PORT` | No | Default `5432` |
-| `DB_NAME` | Yes | Database name |
-| `DB_USER` | Yes | Database user |
-| `DB_PASSWORD` | Yes | Database password |
-| `SPOTIFY_CLIENT_ID` | Yes | From Spotify Developer Dashboard |
-| `SPOTIFY_CLIENT_SECRET` | Yes | From Spotify Developer Dashboard |
-| `SPOTIFY_REDIRECT_URI` | Yes | Must match Spotify Dashboard exactly (e.g. `http://localhost:3000/callback` in development) |
-| `OPENWEATHER_API_KEY` | Yes | From OpenWeatherMap |
-| `JWT_SECRET` | Yes | Random string ≥ 64 characters |
-| `SESSION_SECRET` | Yes | Random string ≥ 64 characters |
-| `FRONTEND_URL` | Yes | Used for CORS and post-OAuth redirect |
-| `RATE_LIMIT_WINDOW_MS` | No | Default `900000` (15 min) |
-| `RATE_LIMIT_MAX_REQUESTS` | No | Default `100` |
-
-### Generating secrets
+To securely reset or update an administrative password via terminal, utilize the seeder script flag:
 ```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+ADMIN_PASS="your_new_secure_password" node backend/database/seed_admin.js --reset
 ```
 
 ---
 
-## Database Setup
+## 📡 Essential Core API Reference
 
-### Manual setup
-```bash
-# Create database
-psql -U postgres -c "CREATE DATABASE weathify_db;"
+### User Authentication & Platform Connection
+| Method | Endpoint | Payload / Query Parameters | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/register` | `{ username, email, password }` | Registers a new user session profile. |
+| `POST` | `/auth/login` | `{ username, password }` | Authenticates user; issues secured httpOnly JWT. |
+| `GET` | `/api/spotify/login` | *None* | Redirects the authenticated user to the Spotify OAuth workflow. |
+| `GET` | `/api/spotify/callback` | `?code=code&state=state` | Processes incoming Spotify authentication payloads. |
 
-# Run schema (creates all tables, indexes, default tags)
-psql -U postgres -d weathify_db -f database/schema.sql
+### Recommendation Generation
+| Method | Endpoint | Payload / Query Parameters | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/recommendations` | `{ latitude, longitude }` | Fetches live tracks based on localized GPS weather data. |
+| `POST` | `/api/recommendations` | `{ weather, season, time_of_day }` | Generates suggestions using user-selected configurations. |
 
-# Optional: create or reset default admin user
-# (uses ADMIN_* env vars if set, otherwise admin / admin123)
-node database/seed_admin.js --reset
-
-# Optional: seed sample songs from Spotify
-# (requires valid SPOTIFY_* credentials in .env)
-node database/seed_songs.js
-```
-
-### Via setup script (recommended)
-```bash
-./setup.sh
-```
-
-The script creates the database, runs the schema, and lets you change the
-default admin password interactively.
-
-### Default admin account
-
-If you use the seeder defaults, the admin account is:
-
-| Username | Password |
-|----------|----------|
-| `admin`  | `admin123` |
-
-If you ran `setup.sh` and changed the password interactively, use that value instead.
-
-To (re)set the admin password later, run:
-```bash
-# Uses ADMIN_USER / ADMIN_PASS / ADMIN_EMAIL from .env if set
-ADMIN_PASS="your_new_password" node database/seed_admin.js --reset
-```
+### Administrative Controls (Requires Admin Authorization)
+| Method | Endpoint | Payload | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/admin/dashboard/stats` | *None* | Extracts aggregate application tracking analytics. |
+| `POST` | `/api/admin/songs` | `{ spotify_track_id }` | Imports a new song asset out of the Spotify library metadata. |
+| `POST` | `/api/admin/songs/:id/tags` | `{ tag_id, weight }` | Modifies scoring weights (`1.0` baseline) for weather tags. |
 
 ---
 
-## API Reference
+## 📈 Recommendation Engine Logic
 
-### Authentication
+Tracks carry customized contextual tags mapped to target weather states, timeframes, or seasons. The system processes inputs using a database scoring method where matching weights determine relevancy:
 
-| Method | Path | Body | Description |
-|--------|------|------|-------------|
-| `POST` | `/auth/register` | `{username, email, password, full_name?}` | Register a new user |
-| `POST` | `/auth/login` | `{username, password}` | User login |
-| `POST` | `/auth/logout` | — | Clear user session |
-| `GET` | `/auth/me` | — | Get current authenticated user |
-| `POST` | `/auth/admin/login` | `{username, password}` | Admin login |
-| `POST` | `/auth/admin/logout` | — | Clear admin session |
-| `GET` | `/auth/admin/me` | — | Get current admin |
-
-### Spotify connection (user)
-
-| Method | Path | Body / Query | Description |
-|--------|------|-------------|-------------|
-| `GET` | `/api/spotify/login` | — | Redirect logged-in user to Spotify OAuth |
-| `GET` | `/api/spotify/callback` | `?code&state` | Spotify OAuth callback (also available at `/callback`) |
-| `GET` | `/api/spotify/token` | — | Get or refresh the current user's Spotify access token |
-| `DELETE` | `/api/spotify/disconnect` | — | Disconnect Spotify for the current user |
-
-### Recommendations
-
-| Method | Path | Body / Query | Description |
-|--------|------|-------------|-------------|
-| `POST` | `/api/recommendations` | `{latitude, longitude}` | Recommendations by GPS |
-| `POST` | `/api/recommendations` | `{weather, season, time_of_day}` | Recommendations by manual context |
-| `GET` | `/api/recommendations/search` | `?q=query&limit=20` | Search song library |
-| `POST` | `/api/recommendations/like` | `{song_id, weather?, season?, time_of_day?}` | Like a song for the current user |
-| `DELETE` | `/api/recommendations/unlike/:song_id` | — | Remove a song from the user's playlist |
-| `GET` | `/api/playlist` | — | Get the current user's liked songs (playlist) |
-
-**Recommendation response:**
-```json
-{
-  "songs": [
-    {
-      "id": "uuid",
-      "spotify_track_id": "3n3Ppam7vgaVa1iaRUc9Lp",
-      "title": "Riders on the Storm",
-      "artist": "The Doors",
-      "album": "L.A. Woman",
-      "duration_ms": 428000,
-      "spotify_url": "https://open.spotify.com/track/...",
-      "album_art_url": "https://i.scdn.co/image/...",
-      "popularity": 78,
-      "matched_tags": ["rainy", "stormy", "night", "autumn"],
-      "relevance_score": "7.6"
-    }
-  ],
-  "context": {
-    "weather": "rainy",
-    "season": "autumn",
-    "time_of_day": "evening"
-  },
-  "explanation": "These songs were selected for a rainy autumn evening. Perfect soundtrack for your current vibe."
-}
-```
-
-### Admin (all require admin auth)
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/admin/dashboard/stats` | Analytics overview |
-| `GET` | `/api/admin/songs` | List songs (`?page&limit&search`) |
-| `GET` | `/api/admin/songs/:id` | Single song with tag details |
-| `POST` | `/api/admin/songs` | Import track (`{spotify_track_id}`) |
-| `PUT` | `/api/admin/songs/:id` | Update metadata |
-| `DELETE` | `/api/admin/songs/:id` | Delete song |
-| `POST` | `/api/admin/songs/:id/tags` | Assign tag (`{tag_id, weight}`) |
-| `DELETE` | `/api/admin/songs/:id/tags/:tagId` | Remove tag |
-| `GET` | `/api/admin/tags` | List all tags |
-| `POST` | `/api/admin/tags` | Create tag (`{name, category, description}`) |
-| `GET` | `/api/admin/spotify/search` | Search Spotify (`?q&limit`) |
-
-### Health
-```
-GET /health
-→ { "status": "healthy", "timestamp": "...", "uptime": 123.4 }
-```
-
----
-
-## Admin Dashboard
-
-### Accessing
-
-Navigate to `http://localhost:3000/admin.html`
-
-Default credentials (if you used the seeder defaults): `admin` / `admin123` 
-
-### Overview tab
-Displays anonymised aggregate analytics:
-- Total recommendation requests
-- Most-requested weather condition, time of day, season
-- Bar charts for each category
-- Top locations (city + country)
-
-### Songs tab
-- Search existing library
-- Import new tracks by searching Spotify
-- Edit title / artist / album metadata
-- Assign / remove weather, season, and time-of-day tags
-- Delete songs
-
-### Tags tab
-- View all tags grouped by category
-- Create new custom tags
-- Delete tags 
-
-### Scoring weights
-
-When assigning tags via the Edit modal, all tags default to weight `1.0`.
-To set a custom weight, use the API directly:
 ```bash
-curl -X POST http://localhost:3000/api/admin/songs/{id}/tags \
+curl -X POST http://localhost:5000/api/admin/songs/{song_uuid}/tags \
   -H "Content-Type: application/json" \
-  -b "adminToken=YOUR_TOKEN" \
-  -d '{"tag_id": "uuid", "weight": 0.7}'
+  -b "adminToken=YOUR_JWT_TOKEN" \
+  -d '{"tag_id": "tag_uuid", "weight": 0.85}'
 ```
 
 ---
 
-## Project Structure
+## 📂 Streamlined Folder Structure
+
 ```
 weathify/
-├── config/
-│   └── database.js          # pg Pool + query helpers
-├── database/
-│   ├── schema.sql           # Tables, indexes, default tags
-│   ├── seed_admin.js        # Admin account seeder
-│   └── seed_songs.js        # Sample songs + tag assignments from Spotify
-├── docs/
-│   ├── ALGORITHM.md         # Recommendation scoring explained
-│   ├── DEPLOYMENT.md        # Production deployment guide
-│   └── STRUCTURE.md         # Detailed file reference & API surface
-├── middleware/
-│   └── auth.js              # Auth helpers for users/admins
-├── public/
-│   ├── css/
-│   │   ├── style.css        # Base styles (landing)
-│   │   ├── admin.css        # Admin dashboard styles
-│   │   ├── auth.css         # Login / register pages
-│   │   ├── dashboard.css    # User dashboard
-│   │   └── player.css       # Player / playlist UI
-│   ├── images/
-│   │   └── placeholder.svg  # Fallback album art
-│   ├── js/
-│   │   ├── admin.js         # Admin dashboard logic
-│   │   ├── dashboard.js     # User dashboard logic
-│   │   ├── login.js         # Login form logic
-│   │   ├── player.js        # Spotify player + controls
-│   │   ├── playlist.js      # Playlist page logic
-│   │   └── register.js      # Registration form logic
-│   ├── index.html           # Landing page
-│   ├── login.html           # Login page
-│   ├── register.html        # Registration page
-│   ├── dashboard.html       # User dashboard
-│   ├── playlist.html        # Playlist view
-│   └── admin.html           # Admin interface
-├── routes/
-│   ├── auth.js              # Auth endpoints (users + admins)
-│   ├── recommendations.js   # Recommendation, search, likes, playlist
-│   ├── admin.js             # Admin CRUD endpoints
-│   └── spotify.js           # Spotify OAuth + token management
-├── services/
-│   ├── analyticsService.js      # Event logging + stats queries
-│   ├── recommendationService.js # Scoring algorithm
-│   ├── spotifyService.js        # Spotify API wrapper
-│   └── weatherService.js        # OpenWeatherMap wrapper + time/season helpers
-├── .env.example
-├── .gitignore
-├── package.json
-├── README.md
-├── server.js
-└── setup.sh
+├── backend/
+│   ├── config/database.js          # PostgreSQL engine pool client instances
+│   ├── database/
+│   │   ├── schema.sql              # Clean table structures, database indexes, tags
+│   │   ├── seed_admin.js           # Admin authentication initialization
+│   │   └── seed_songs.js           # Target track loader utilizing Spotify context
+│   ├── middleware/auth.js          # Route token verification interceptors
+│   ├── routes/                     # Modular Express routers (auth, recommendations, admin)
+│   ├── services/                   # Scoring matrixes, OpenWeatherMap, & Spotify SDKs
+│   └── server.js                   # Application listener root entrypoint
+├── frontend/
+│   ├── app/                        # Next.js system pages and layouts
+│   ├── components/                 # Shared dashboard modular interface components
+│   └── package.json                # Next.js application parameters
+├── setup.sh                        # Automated Unix environmental initialization script
+└── .env.example                    # Template fallback context mapping configuration
 ```
 
 ---
 
-## Deployment
+## 🌐 Production Cloud Deployments
 
-See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for full guides covering:
-- Heroku
-- Railway
-- DigitalOcean App Platform
-- DigitalOcean Droplet (manual — Node + Nginx + PM2 + SSL)
-
-### Quick Heroku deploy
-```bash
-heroku create your-app-name
-heroku addons:create heroku-postgresql:mini
-heroku config:set NODE_ENV=production
-heroku config:set SPOTIFY_CLIENT_ID=xxx
-heroku config:set SPOTIFY_CLIENT_SECRET=xxx
-heroku config:set SPOTIFY_REDIRECT_URI=https://your-app-name.herokuapp.com/auth/spotify/callback
-heroku config:set OPENWEATHER_API_KEY=xxx
-heroku config:set JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
-heroku config:set SESSION_SECRET=$(node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
-heroku config:set FRONTEND_URL=https://your-app-name.herokuapp.com
-git push heroku main
-heroku pg:psql < database/schema.sql
-```
+The backend layer is fully set up for cloud deployments such as [Railway](https://railway.app/). When hosting in production environments:
+1. Ensure your host platform runs your environment on `NODE_ENV=production`.
+2. Configure all variables listed in the Environment section directly inside your cloud platform dashboard.
+3. Update `SPOTIFY_REDIRECT_URI` to use your production domain: `https://your-backend-service.railway.app/callback`.
+4. Ensure the `FRONTEND_URL` points directly to your live production frontend application client domain to maintain correct CORS headers.
 
 ---
 
-## Troubleshooting
-
-### OAuth callback error
-Ensure the redirect URI in your Spotify Developer Dashboard **exactly** matches
-`SPOTIFY_REDIRECT_URI` in `.env`, including protocol and trailing slash.
-
-### Database connection refused
-```bash
-# Check PostgreSQL is running
-sudo service postgresql status
-
-# Test connection manually
-psql -U postgres -d weathify_db
-```
-
-### No recommendations returned
-1. Check the songs table has entries: `SELECT COUNT(*) FROM songs;`
-2. Check tag assignments exist: `SELECT COUNT(*) FROM song_tags;`
-3. If empty, (re)seed songs with Spotify: `node database/seed_songs.js` (requires valid SPOTIFY_* env vars)
-
-### Port already in use
-```bash
-lsof -i :3000       # find the PID
-kill -9 <PID>       # kill it
-```
-
-### Admin login fails
-If you've forgotten or misconfigured the admin password, reset it via the seeder:
-```bash
-ADMIN_PASS="admin123" node database/seed_admin.js --reset
-```
-Then log in with `admin` / `admin123` and change it immediately.
-
----
-
-## Contributing
-
-1. Fork the repo
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit: `git commit -m "feat: add your feature"`
-4. Push: `git push origin feature/your-feature`
-5. Open a pull request
-
----
-
-## License
-
-MIT — free for personal and commercial use.
-
----
-
-*Built with 🎵 by the Weathify team*
+## 📄 License
+Distributed via standard open-source **MIT License** terms.
