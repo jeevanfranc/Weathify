@@ -4,7 +4,6 @@ const session      = require('express-session');
 const helmet       = require('helmet');
 const cors         = require('cors');
 const rateLimit    = require('express-rate-limit');
-const path         = require('path');
 require('dotenv').config();
 
 const authRoutes          = require('./routes/auth');
@@ -75,9 +74,6 @@ app.use(session({
   },
 }));
 
-// ── 7. Static files ──────────────────────────────────────────
-app.use(express.static(path.join(__dirname, 'public')));
-
 // ── 8. Routes ────────────────────────────────────────────────
 app.use('/auth', authRoutes);
 app.use('/api/recommendations', recommendationRoutes);  // handles /api/recommendations/*
@@ -100,28 +96,9 @@ app.get('/health', (req, res) => {
   });
 });
 
-// STATIC HTML PAGES — Specific routes for auth pages
-app.get('/login.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
-app.get('/register.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'register.html'));
-});
-
-app.get('/dashboard.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-// CATCH-ALL — LAST, for SPA root and 404s
-app.get('*', (req, res) => {
-  // For API routes that weren't matched, return 404 JSON instead of HTML
-  if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) {
-    return res.status(404).json({ error: 'Route not found' });
-  }
-  
-  // For all other routes, serve index.html
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // ── 10. Error handler ────────────────────────────────────────

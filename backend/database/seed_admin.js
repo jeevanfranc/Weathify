@@ -122,7 +122,6 @@ async function run() {
       console.log(`  Role     : ${a.role}`);
       console.log(`  Password : ${password}`);
       console.log('[seed_admin] ────────────────────────────────────');
-      console.log('[seed_admin] ✓ Admin account is ready. Log in at /admin.html');
     }
   } catch (err) {
     await client.query('ROLLBACK');
