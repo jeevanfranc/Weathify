@@ -2,10 +2,10 @@ name: Backend CI
 
 on:
   push:
-    branches: [Development]
+    branches: [main, Development]
     paths: ['backend/**']
   pull_request:
-    branches: [Development]
+    branches: [main, Development]
     paths: ['backend/**']
 
 jobs:
@@ -26,4 +26,8 @@ jobs:
 
       - name: Lint (if configured)
         run: npm run lint --if-present
+        working-directory: backend
+
+      - name: Test
+        run: npm test
         working-directory: backend

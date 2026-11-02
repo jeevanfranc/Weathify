@@ -6,14 +6,14 @@
  * default admin account.
  *
  * Usage:
- *   node database/seed_admin.js                     # uses defaults
- *   node database/seed_admin.js  --reset            # resets password to default
+ *   ADMIN_PASS=secret123 node database/seed_admin.js
+ *   ADMIN_PASS=secret123 node database/seed_admin.js --reset
  *   ADMIN_USER=myadmin ADMIN_PASS=secret123 node database/seed_admin.js
  *
- * Environment variables (all optional):
+ * Environment variables:
  *   ADMIN_USER   — username  (default: admin)
  *   ADMIN_EMAIL  — email     (default: admin@weathify.com)
- *   ADMIN_PASS   — password  (default: admin123)
+ *   ADMIN_PASS   — password  (required)
  */
 
 'use strict';
@@ -35,8 +35,12 @@ const pool = new Pool({
 async function run() {
   const username = process.env.ADMIN_USER  || 'admin';
   const email    = process.env.ADMIN_EMAIL || `${username}@weathify.com`;
-  const password = process.env.ADMIN_PASS  || 'admin123';
+  const password = process.env.ADMIN_PASS;
   const reset    = process.argv.includes('--reset');
+
+  if (!password) {
+    throw new Error('ADMIN_PASS is required. Set it in backend/.env before running seed_admin.js.');
+  }
 
   console.log(`[seed_admin] Config: username=${username}, email=${email}`);
 
