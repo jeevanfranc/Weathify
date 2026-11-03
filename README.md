@@ -2,7 +2,7 @@
 
 Weathify recommends music using weather, season, and time-of-day context.
 
-Originally a university group project; the Next.js migration, CI and unit tests were done independently afterwards.
+Originally a university group project (original repo: [Berketunc/Weathify](https://github.com/Berketunc/Weathify)). The Next.js migration, CI and unit tests were done independently afterwards.
 
 ## Architecture
 
@@ -30,17 +30,17 @@ cd ..
 
 ### Environment files
 
-The repository contains `.env.example`, `backend/.env`, and `frontend/.env`. No `backend/.env.example` or `frontend/.env.example` was found.
+Create three files:
 
-Create the root file used by `setup.sh`:
+- Root `.env`: copy `.env.example` (`cp .env.example .env`). It is read by `setup.sh` and needs the database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) and `ADMIN_PASS`.
+- `backend/.env`: read by the backend and the admin seeder.
+- `frontend/.env`: read by the Next.js app.
 
-```bash
-cp .env.example .env
-```
+Use the same `DB_NAME` and `DB_PASSWORD` in the root `.env` and `backend/.env`. Never commit any `.env` file.
 
 The backend reads `NODE_ENV`, `PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`, `OPENWEATHER_API_KEY`, `JWT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `RATE_LIMIT_WINDOW_MS`, and `RATE_LIMIT_MAX_REQUESTS` from `backend/.env`.
 
-The admin seeder also reads `ADMIN_USER`, `ADMIN_EMAIL`, and `ADMIN_PASS`. Set the admin password through `ADMIN_PASS` in `backend/.env`. `ADMIN_PASSWORD` is not read by the seeder.
+The admin seeder also reads `ADMIN_USER`, `ADMIN_EMAIL`, and `ADMIN_PASS`. There is no default admin password: `ADMIN_PASS` is required in both the root `.env` (for `setup.sh`) and `backend/.env` (for the seeder), and the scripts stop with an error if it is missing. `ADMIN_PASSWORD` is not read.
 
 The Next.js app reads `NEXT_PUBLIC_EXPRESS_API_URL` from `frontend/.env`, normally set to `http://localhost:5000`.
 
@@ -50,18 +50,24 @@ For local Spotify OAuth, set:
 SPOTIFY_REDIRECT_URI=http://127.0.0.1:5000/callback
 ```
 
-The backend handles `/callback` on its own port. No Next.js `/callback` page was found. If `SPOTIFY_REDIRECT_URI` is unset, the route code falls back to `http://127.0.0.1:3000/callback`; set the variable explicitly to use the backend callback.
+The backend handles the Spotify callback at `/callback` on port 5000, so `SPOTIFY_REDIRECT_URI` must point there. Register the same URL in the Spotify Developer dashboard.
 
 ### Database setup
 
-Run this from the repository root with PostgreSQL running:
+Run this from the repository root with PostgreSQL running, in Git Bash or another bash shell:
 
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
 
-`setup.sh` creates the database if it is missing, asks for confirmation before dropping an existing database, applies `database/schema.sql`, and optionally sets the admin password.
+`setup.sh` creates the database if it is missing, asks for confirmation before dropping an existing database, applies `backend/database/schema.sql`, and sets the admin password from `ADMIN_PASS`.
+
+The script calls `psql`, which asks for your PostgreSQL password. To avoid repeated prompts, run this first (it only lasts for the current terminal):
+
+```bash
+export PGPASSWORD='your_postgres_password'
+```
 
 Optional song seeding:
 
@@ -114,12 +120,12 @@ weathify/
 
 ## Deployment
 
-The backend can be deployed to [Railway](https://railway.app/).
+The project is not currently hosted. The backend can be deployed to Railway or a similar host.
 
-Set the environment variables in the Railway service. Use the backend service URL for:
+When deploying, set the environment variables in the hosting service and use the backend service URL for the callback:
 
 ```ini
-SPOTIFY_REDIRECT_URI=https://your-backend-service.railway.app/callback
+SPOTIFY_REDIRECT_URI=https://your-backend-service.example.com/callback
 ```
 
 Set `FRONTEND_URL` to the deployed frontend URL so the backend CORS configuration allows it. Register the same callback URL in the Spotify Developer dashboard.
@@ -128,9 +134,8 @@ Set `FRONTEND_URL` to the deployed frontend URL so the backend CORS configuratio
 
 ### Works
 
-- Next.js home, login, and dashboard pages exist.
-- The Express authentication, recommendation, Spotify, and admin API routes exist.
-- A backend Jest unit test file exists for recommendation diversity behavior.
+- Registration, login, weather-based recommendations, Spotify connection and in-app playback work locally.
+- The backend CI workflow runs lint and the Jest unit tests (recommendation diversity logic) on pushes and pull requests to `main` and `Development`.
 
 ### Untested
 
@@ -139,7 +144,7 @@ Set `FRONTEND_URL` to the deployed frontend URL so the backend CORS configuratio
 
 ### Planned
 
-- Playlist and profile pages are not yet migrated to Next.js and are currently unavailable.
+- The playlist and profile pages are not yet migrated to Next.js and are currently unavailable. The backend playlist API already exists.
 
 ## License
 

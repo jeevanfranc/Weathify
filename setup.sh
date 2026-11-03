@@ -4,6 +4,7 @@
 # This script sets up the database and creates an admin user
 
 set -e
+set -o pipefail
 
 echo "Weathify Setup Script"
 echo "======================="
@@ -63,7 +64,7 @@ echo ""
 
 # Run schema
 echo " Running database schema..."
-cat database/schema.sql | psql -h localhost -U ${DB_USER} -d ${DB_NAME}
+psql -h localhost -U ${DB_USER} -d ${DB_NAME} -f backend/database/schema.sql
 
 echo ""
 echo " Database setup complete!"
@@ -74,8 +75,8 @@ echo " Admin Account Setup"
 echo "====================="
 echo ""
 echo "Setting admin password..."
-HASH=$(ADMIN_PASS="$ADMIN_PASS" node -e "console.log(require('bcrypt').hashSync(process.env.ADMIN_PASS, 10))")
-psql -h localhost -U ${DB_USER} -d ${DB_NAME} -c "UPDATE admins SET password_hash = '${HASH}' WHERE username = 'admin';"
+export ADMIN_PASS
+(cd backend && node database/seed_admin.js --reset) > /dev/null
 echo " Admin password updated!"
 
 echo ""
