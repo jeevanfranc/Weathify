@@ -4,6 +4,7 @@
 # This script sets up the database and creates an admin user
 
 set -e
+set -o pipefail
 
 echo "Weathify Setup Script"
 echo "======================="
@@ -19,6 +20,13 @@ fi
 
 # Load environment variables
 source .env
+
+# Require an admin password
+if [ -z "${ADMIN_PASS}" ]; then
+    echo " Error: ADMIN_PASS is not set in .env"
+    echo "Set ADMIN_PASS before running setup.sh"
+    exit 1
+fi
 
 # Check if PostgreSQL is installed
 if ! command -v psql &> /dev/null; then
@@ -56,7 +64,7 @@ echo ""
 
 # Run schema
 echo " Running database schema..."
-cat database/schema.sql | psql -h localhost -U ${DB_USER} -d ${DB_NAME}
+psql -h localhost -U ${DB_USER} -d ${DB_NAME} -f backend/database/schema.sql
 
 echo ""
 echo " Database setup complete!"
@@ -66,37 +74,10 @@ echo ""
 echo " Admin Account Setup"
 echo "====================="
 echo ""
-echo "Default admin credentials:"
-echo "  Username: admin"
-echo "  Password: admin123"
-echo ""
-echo "  IMPORTANT: You should change the default password!"
-echo ""
-read -p "Would you like to change the admin password now? (Y/n): " -n 1 -r
-echo
-
-if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    read -s -p "Enter new admin password: " NEW_PASSWORD
-    echo
-    read -s -p "Confirm new password: " CONFIRM_PASSWORD
-    echo
-    
-    if [ "$NEW_PASSWORD" != "$CONFIRM_PASSWORD" ]; then
-        echo " Passwords don't match!"
-        exit 1
-    fi
-    
-    # Generate bcrypt hash using Node.js
-    echo "Generating password hash..."
-    HASH=$(node -e "console.log(require('bcrypt').hashSync('${NEW_PASSWORD}', 10))")
-    
-    # Update password in database
-    psql -h localhost -U ${DB_USER} -d ${DB_NAME} -c "UPDATE admins SET password_hash = '${HASH}' WHERE username = 'admin';"
-    
-    echo " Admin password updated!"
-else
-    echo " Remember to change the default password in production!"
-fi
+echo "Setting admin password..."
+export ADMIN_PASS
+(cd backend && node database/seed_admin.js --reset) > /dev/null
+echo " Admin password updated!"
 
 echo ""
 echo "🎉 Setup Complete!"
@@ -106,6 +87,4 @@ echo "1. Configure your .env file with API credentials"
 echo "2. Run 'npm install' to install dependencies"
 echo "3. Run 'npm run dev' to start the development server"
 echo "4. Visit http://localhost:3000"
-echo ""
-echo "Admin dashboard: http://localhost:3000/admin.html"
 echo ""

@@ -1,179 +1,151 @@
-# 🎵 Weathify: Music That Matches Your Weather
+# Weathify
 
-Weathify recommends tracks based on your current weather conditions, time of day, and season. A weighted tag-matching engine scores songs stored in PostgreSQL against live conditions and returns ranked matches with relevance scores.
+Weathify recommends music using weather, season, and time-of-day context.
 
-### 🚀 Architecture Overview
-*   **Frontend:** Next.js (TypeScript) running on **Port 3000**
-*   **Backend:** Node.js / Express running on **Port 5000**
-*   **Database:** PostgreSQL running on **Port 5432**
+Originally a university group project (original repo: [Berketunc/Weathify](https://github.com/Berketunc/Weathify)). The Next.js migration, CI and unit tests were done independently afterwards.
 
----
+## Architecture
 
-## 🛠️ Prerequisites
+- Frontend: Next.js and TypeScript on port 3000.
+- Backend: Node.js and Express on port 5000.
+- Database: PostgreSQL on port 5432.
 
-*   Node.js (>= 18.0.0) & npm (>= 9.0.0)
-*   PostgreSQL
-*   [Spotify Developer App Credentials](https://developer.spotify.com/dashboard)
-*   [OpenWeatherMap API Key](https://openweathermap.org/api)
+The backend exposes an admin API under `/api/admin`, with no UI, used to import songs and manage tags.
 
----
+## Requirements
 
-## ⚡ Quick Start
+Node.js 18+, npm 9+, PostgreSQL, Spotify Developer App credentials, and an OpenWeatherMap API key.
 
-### 1. Clone & Install
+## Setup
+
+Install dependencies:
+
 ```bash
-# Clone the repository
-git clone <YOUR_REPO_URL>
-cd Weathify
-
-# Install backend dependencies
-cd backend && npm install
-
-# Install frontend dependencies
-cd ../frontend && npm install
+cd backend
+npm install
+cd ../frontend
+npm install
 cd ..
 ```
 
-### 2. Configure Environment Variables
-Create a `.env` file inside **both** the frontend and backend folders by copying their respective examples.
+### Environment files
 
-*   For the **Backend (`backend/.env`)**:
-    ```ini
-    NODE_ENV=development
-    PORT=5000
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_NAME=weathify_db
-    DB_USER=postgres
-    DB_PASSWORD=your_postgres_password
-    
-    # Optional Custom Admin Setup (Defaults to admin/admin123 if blank)
-    ADMIN_USER=admin
-    ADMIN_EMAIL=admin@weathify.com
-    ADMIN_PASS=admin123
+Create three files:
 
-    SPOTIFY_CLIENT_ID=your_spotify_client_id
-    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-    SPOTIFY_REDIRECT_URI=http://localhost:5000/callback
-    OPENWEATHER_API_KEY=your_openweather_api_key
-    
-    JWT_SECRET=your_64_char_random_string
-    SESSION_SECRET=your_64_char_random_string
-    FRONTEND_URL=http://localhost:3000
-    ```
-*   For the **Frontend (`frontend/.env`)**:
-    ```ini
-    NEXT_PUBLIC_API_URL=http://localhost:5000
-    ```
+- Root `.env`: copy `.env.example` (`cp .env.example .env`). It is read by `setup.sh` and needs the database settings (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) and `ADMIN_PASS`.
+- `backend/.env`: read by the backend and the admin seeder.
+- `frontend/.env`: read by the Next.js app.
 
-> 💡 **Tip:** Generate a secure 64-character secret using Node.js:
-> `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
+Use the same `DB_NAME` and `DB_PASSWORD` in the root `.env` and `backend/.env`. Never commit any `.env` file.
 
-### 3. Initialize the Database
-Ensure your local PostgreSQL instance is running, then run the automated setup script from the root directory:
+The backend reads `NODE_ENV`, `PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`, `OPENWEATHER_API_KEY`, `JWT_SECRET`, `SESSION_SECRET`, `FRONTEND_URL`, `RATE_LIMIT_WINDOW_MS`, and `RATE_LIMIT_MAX_REQUESTS` from `backend/.env`.
+
+The admin seeder also reads `ADMIN_USER`, `ADMIN_EMAIL`, and `ADMIN_PASS`. There is no default admin password: `ADMIN_PASS` is required in both the root `.env` (for `setup.sh`) and `backend/.env` (for the seeder), and the scripts stop with an error if it is missing. `ADMIN_PASSWORD` is not read.
+
+The Next.js app reads `NEXT_PUBLIC_EXPRESS_API_URL` from `frontend/.env`, normally set to `http://localhost:5000`.
+
+For local Spotify OAuth, set:
+
+```ini
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:5000/callback
+```
+
+The backend handles the Spotify callback at `/callback` on port 5000, so `SPOTIFY_REDIRECT_URI` must point there. Register the same URL in the Spotify Developer dashboard.
+
+### Database setup
+
+Run this from the repository root with PostgreSQL running, in Git Bash or another bash shell:
+
 ```bash
 chmod +x setup.sh
 ./setup.sh
 ```
-*The script drops/re-creates the database, creates the schema structure, and initializes your administrator profile.*
 
-### 4. Seed Track Library (Optional)
-To query songs, seed sample data from Spotify using your configured API credentials:
+`setup.sh` creates the database if it is missing, asks for confirmation before dropping an existing database, applies `backend/database/schema.sql`, and sets the admin password from `ADMIN_PASS`.
+
+The script calls `psql`, which asks for your PostgreSQL password. To avoid repeated prompts, run this first (it only lasts for the current terminal):
+
+```bash
+export PGPASSWORD='your_postgres_password'
+```
+
+Optional song seeding:
+
 ```bash
 node backend/database/seed_songs.js
 ```
 
-### 5. Launch Development Environments
-Open two distinct terminal windows to launch both layers concurrently:
-*   **Run Backend:** `cd backend && npm run dev` (Runs on `http://localhost:5000`)
-*   **Run Frontend:** `cd frontend && npm run dev` (Runs on `http://localhost:3000`)
+### Run the applications
 
----
-
-## 🔑 Default Credentials & Admin Dashboard
-
-*   **Default Admin Username:** `admin`
-*   **Default Admin Password:** `admin123`
-*   **Admin Platform Route:** `http://localhost:3000/admin.html`
-
-To securely reset or update an administrative password via terminal, utilize the seeder script flag:
-```bash
-ADMIN_PASS="your_new_secure_password" node backend/database/seed_admin.js --reset
-```
-
----
-
-## 📡 Essential Core API Reference
-
-### User Authentication & Platform Connection
-| Method | Endpoint | Payload / Query Parameters | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/auth/register` | `{ username, email, password }` | Registers a new user session profile. |
-| `POST` | `/auth/login` | `{ username, password }` | Authenticates user; issues secured httpOnly JWT. |
-| `GET` | `/api/spotify/login` | *None* | Redirects the authenticated user to the Spotify OAuth workflow. |
-| `GET` | `/api/spotify/callback` | `?code=code&state=state` | Processes incoming Spotify authentication payloads. |
-
-### Recommendation Generation
-| Method | Endpoint | Payload / Query Parameters | Description |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/recommendations` | `{ latitude, longitude }` | Fetches live tracks based on localized GPS weather data. |
-| `POST` | `/api/recommendations` | `{ weather, season, time_of_day }` | Generates suggestions using user-selected configurations. |
-
-### Administrative Controls (Requires Admin Authorization)
-| Method | Endpoint | Payload | Description |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/admin/dashboard/stats` | *None* | Extracts aggregate application tracking analytics. |
-| `POST` | `/api/admin/songs` | `{ spotify_track_id }` | Imports a new song asset out of the Spotify library metadata. |
-| `POST` | `/api/admin/songs/:id/tags` | `{ tag_id, weight }` | Modifies scoring weights (`1.0` baseline) for weather tags. |
-
----
-
-## 📈 Recommendation Engine Logic
-
-Tracks carry customized contextual tags mapped to target weather states, timeframes, or seasons. The system processes inputs using a database scoring method where matching weights determine relevancy:
+In separate terminals:
 
 ```bash
-curl -X POST http://localhost:5000/api/admin/songs/{song_uuid}/tags \
-  -H "Content-Type: application/json" \
-  -b "adminToken=YOUR_JWT_TOKEN" \
-  -d '{"tag_id": "tag_uuid", "weight": 0.85}'
+cd backend && npm run dev
+cd frontend && npm run dev
 ```
 
----
+## API reference
 
-## 📂 Streamlined Folder Structure
+This is a partial list of the 30 Express route declarations.
 
-```
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/auth/register` | Register a user. |
+| POST | `/auth/login` | Log in a user. |
+| GET | `/auth/me` | Get the current user. |
+| POST | `/api/recommendations/` | Get recommendations. |
+| GET | `/api/recommendations/playlist` | Get liked songs. |
+| GET | `/api/spotify/login` | Start Spotify OAuth. |
+| GET | `/api/spotify/token` | Get the user's Spotify token. |
+| GET | `/api/spotify/profile` | Get the Spotify profile. |
+| DELETE | `/api/spotify/disconnect` | Remove the Spotify connection. |
+| GET | `/api/admin/songs` | List songs. |
+| POST | `/api/admin/songs` | Import a Spotify song. |
+| POST | `/api/admin/songs/:id/tags` | Assign a tag to a song. |
+
+## Recommendation scoring
+
+The service scores songs by matching weather tags with weight `3`, season and time-of-day tags with weight `2`, then orders by score and popularity. It loads extra results, limits each artist to two songs, and shuffles the last 20%; database errors use popularity-ordered fallback results. See [docs/ALGORITHM.md](docs/ALGORITHM.md).
+
+## Project structure
+
+```text
 weathify/
-├── backend/
-│   ├── config/database.js          # PostgreSQL engine pool client instances
-│   ├── database/
-│   │   ├── schema.sql              # Clean table structures, database indexes, tags
-│   │   ├── seed_admin.js           # Admin authentication initialization
-│   │   └── seed_songs.js           # Target track loader utilizing Spotify context
-│   ├── middleware/auth.js          # Route token verification interceptors
-│   ├── routes/                     # Modular Express routers (auth, recommendations, admin)
-│   ├── services/                   # Scoring matrixes, OpenWeatherMap, & Spotify SDKs
-│   └── server.js                   # Application listener root entrypoint
-├── frontend/
-│   ├── app/                        # Next.js system pages and layouts
-│   ├── components/                 # Shared dashboard modular interface components
-│   └── package.json                # Next.js application parameters
-├── setup.sh                        # Automated Unix environmental initialization script
-└── .env.example                    # Template fallback context mapping configuration
+├── .env.example
+├── backend/   # config, database, middleware, routes, services, server.js
+├── docs/      # project documentation
+├── frontend/  # app, components, hooks, public/css, public/images, types
+└── setup.sh
 ```
 
----
+## Deployment
 
-## 🌐 Production Cloud Deployments
+The project is not currently hosted. The backend can be deployed to Railway or a similar host.
 
-The backend layer is fully set up for cloud deployments such as [Railway](https://railway.app/). When hosting in production environments:
-1. Ensure your host platform runs your environment on `NODE_ENV=production`.
-2. Configure all variables listed in the Environment section directly inside your cloud platform dashboard.
-3. Update `SPOTIFY_REDIRECT_URI` to use your production domain: `https://your-backend-service.railway.app/callback`.
-4. Ensure the `FRONTEND_URL` points directly to your live production frontend application client domain to maintain correct CORS headers.
+When deploying, set the environment variables in the hosting service and use the backend service URL for the callback:
 
----
+```ini
+SPOTIFY_REDIRECT_URI=https://your-backend-service.example.com/callback
+```
 
-## 📄 License
-Distributed via standard open-source **MIT License** terms.
+Set `FRONTEND_URL` to the deployed frontend URL so the backend CORS configuration allows it. Register the same callback URL in the Spotify Developer dashboard.
+
+## Project status
+
+### Works
+
+- Registration, login, weather-based recommendations, Spotify connection and in-app playback work locally.
+- The backend CI workflow runs lint and the Jest unit tests (recommendation diversity logic) on pushes and pull requests to `main` and `Development`.
+
+### Untested
+
+- No frontend test script or frontend test framework is declared.
+- No integration or end-to-end test files were found.
+
+### Planned
+
+- The playlist and profile pages are not yet migrated to Next.js and are currently unavailable. The backend playlist API already exists.
+
+## License
+
+MIT.
